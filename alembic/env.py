@@ -1,6 +1,7 @@
 # alembic/env.py - Database Migration Configuration
 # ============================================================================
-
+import sys
+import os
 import asyncio
 from logging.config import fileConfig
 from sqlalchemy import pool
@@ -14,6 +15,8 @@ from app.core.config import settings
 from app.models.user import User
 from app.models.invoice import Invoice, LineItem
 from app.models.payment import Payment
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
