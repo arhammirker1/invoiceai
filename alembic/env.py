@@ -4,10 +4,15 @@ import sys
 import os
 import asyncio
 from logging.config import fileConfig
+
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
+
+# Make sure backend is in path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from app.core.database import Base
 from app.core.config import settings
 
@@ -15,8 +20,6 @@ from app.core.config import settings
 from app.models.user import User
 from app.models.invoice import Invoice, LineItem
 from app.models.payment import Payment
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
