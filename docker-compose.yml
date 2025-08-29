@@ -1,0 +1,134 @@
+# ============================================================================
+# docker-compose.yml - Development Environment
+# ============================================================================
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: invoice_userr
+      POSTGRES_PASSWORD: N12345123-nn
+      POSTGRES_DB: invoiceai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoice_user:N12345123-nn@84.46.251.194:5432/invoiceai
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./storage:/app/storage
+      - ./app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoice_user:N12345123-nn@84.46.251.194:5432/invoiceai
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./storage:/app/storage
+      - ./app:/app/app
+    command: celery -A app.celery_app worker --loglevel=info
+
+  beat:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://invoice_user:N12345123-nn@84.46.251.194:5432/invoiceai
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    command: celery -A app.celery_app beat --loglevel=info
+
+volumes:
+  postgres_data:
+
+# ============================================================================
+# Dockerfile - Application Container
+# ============================================================================
+
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libgtk-3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create storage directories
+RUN mkdir -p /app/storage/uploads /app/storage/excels
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# ============================================================================
+# .env.example - Environment Variables Template
+# ============================================================================
+
+# Database
+DATABASE_URL=postgresql+asyncpg://invoice_user:N12345123-nn@84.46.251.194:5432/invoiceai
+
+# Redis
+REDIS_URL=redis://localhost:6379/0
+
+# Authentication
+SECRET_KEY=your-super-secret-key-change-this-in-production
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+
+# SendGrid
+SENDGRID_API_KEY=SG.your-sendgrid-api-key
+FROM_EMAIL=noreply@invoiceai.com
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# Frontend URL
+FRONTEND_URL=http://localhost:3000
+
+# Storage
+UPLOAD_DIR=/var/www/invoice-app/storage/uploads
+EXCEL_DIR=/var/www/invoice-app/storage/excels
+
+# CORS
+ALLOWED_ORIGINS=["http://localhost:3000", "https://yourdomain.com"]
