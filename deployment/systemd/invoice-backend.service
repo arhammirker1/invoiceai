@@ -1,0 +1,34 @@
+[Unit]
+Description=InvoiceAI FastAPI Backend
+After=network.target postgresql.service redis.service
+Requires=postgresql.service redis.service
+
+[Service]
+Type=exec
+User=invoiceai
+Group=invoiceai
+WorkingDirectory=/var/www/invoice-app/backend
+Environment=PATH=/var/www/invoice-app/backend/venv/bin
+ExecStart=/var/www/invoice-app/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/invoice-app/storage /tmp
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target

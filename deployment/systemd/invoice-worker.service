@@ -1,0 +1,32 @@
+[Unit]
+Description=InvoiceAI Celery Worker
+After=network.target postgresql.service redis.service
+Requires=postgresql.service redis.service
+
+[Service]
+Type=exec
+User=invoiceai
+Group=invoiceai
+WorkingDirectory=/var/www/invoice-app/backend
+Environment=PATH=/var/www/invoice-app/backend/venv/bin
+Environment=C_FORCE_ROOT=1
+ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A app.celery_app worker --loglevel=info --concurrency=4 --prefetch-multiplier=1
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+StartLimitInterval=0
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/invoice-app/storage /tmp
+PrivateTmp=true
+
+# Resource limits - Workers need more resources for OCR/processing
+LimitNOFILE=65536
+MemoryMax=4G
+CPUQuota=400%
+
+[Install]
+WantedBy=multi-user.target

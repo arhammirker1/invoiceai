@@ -1,0 +1,31 @@
+[Unit]
+Description=InvoiceAI Celery Beat Scheduler
+After=network.target postgresql.service redis.service
+Requires=postgresql.service redis.service
+
+[Service]
+Type=exec
+User=invoiceai
+Group=invoiceai
+WorkingDirectory=/var/www/invoice-app/backend
+Environment=PATH=/var/www/invoice-app/backend/venv/bin
+Environment=C_FORCE_ROOT=1
+ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A app.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/invoice-app/storage /tmp
+PrivateTmp=true
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
