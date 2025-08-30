@@ -14,20 +14,6 @@ from typing import List, Optional
 import redis.asyncio as redis
 from celery import Celery
 
-from app.core.config import settings
-from app.core.database import get_db, init_db
-from app.models.user import User
-from app.models.invoice import Invoice, InvoiceStatus
-from app.services.auth import AuthService
-from app.services.storage import StorageService
-from app.services.email import EmailService
-from app.services.payment import PaymentService
-from app.tasks.invoice_processor import process_invoice_task
-from app.schemas.auth import LoginRequest, TokenResponse
-from app.schemas.invoice import InvoiceResponse, InvoiceUploadResponse
-from app.schemas.user import UserResponse
-from celery import Celery
-
 # Initialize Celery app (add this before the FastAPI app creation)
 celery_app = Celery(
     'invoice_processor',
@@ -44,6 +30,22 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
 )
+
+
+from app.core.config import settings
+from app.core.database import get_db, init_db
+from app.models.user import User
+from app.models.invoice import Invoice, InvoiceStatus
+from app.services.auth import AuthService
+from app.services.storage import StorageService
+from app.services.email import EmailService
+from app.services.payment import PaymentService
+from app.tasks.invoice_processor import process_invoice_task
+from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.invoice import InvoiceResponse, InvoiceUploadResponse
+from app.schemas.user import UserResponse
+from celery import Celery
+
 
 # Initialize Redis and Celery
 redis_client = redis.from_url(settings.REDIS_URL)
