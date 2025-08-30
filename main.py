@@ -26,6 +26,24 @@ from app.tasks.invoice_processor import process_invoice_task
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.invoice import InvoiceResponse, InvoiceUploadResponse
 from app.schemas.user import UserResponse
+from celery import Celery
+
+# Initialize Celery app (add this before the FastAPI app creation)
+celery_app = Celery(
+    'invoice_processor',
+    broker=settings.REDIS_URL,
+    backend=settings.REDIS_URL,
+    include=['app.tasks.invoice_processor']
+)
+
+# Celery configuration
+celery_app.conf.update(
+    task_serializer='json',
+    accept_content=['json'],
+    result_serializer='json',
+    timezone='UTC',
+    enable_utc=True,
+)
 
 # Initialize Redis and Celery
 redis_client = redis.from_url(settings.REDIS_URL)
