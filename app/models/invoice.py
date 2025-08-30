@@ -1,11 +1,12 @@
 # models/invoice.py - Invoice Database Model
 # ============================================================================
-
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Numeric
+from sqlalchemy.dialects.postgresql import ENUM as SQLEnum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from enum import Enum
 from app.core.database import Base
+
 
 class InvoiceStatus(str, Enum):
     PENDING = "pending"
