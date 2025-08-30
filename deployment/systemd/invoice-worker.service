@@ -10,7 +10,7 @@ Group=invoiceai
 WorkingDirectory=/var/www/invoice-app/backend
 Environment=PATH=/var/www/invoice-app/backend/venv/bin
 Environment=C_FORCE_ROOT=1
-ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A app.celery_app worker --loglevel=info --concurrency=4 --prefetch-multiplier=1
+ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A app.main:celery_app worker --loglevel=info --concurrency=4
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=10
