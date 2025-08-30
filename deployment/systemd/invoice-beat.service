@@ -10,7 +10,7 @@ Group=invoiceai
 WorkingDirectory=/var/www/invoice-app/backend
 Environment=PATH=/var/www/invoice-app/backend/venv/bin
 Environment=C_FORCE_ROOT=1
-ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A app.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A app.main:celery_app beat --loglevel=info
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
