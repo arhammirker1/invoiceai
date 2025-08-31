@@ -122,14 +122,33 @@ const AuthModal = ({ isOpen, onClose }) => {
 
           {mode === 'login' ? (
             <div className="space-y-4">
-              <button
-                onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl py-3 px-4 hover:border-matcha transition-colors"
-                style={{ borderColor: colors.matcha }}
-              >
-                <Google size={20} />
-                Continue with Google
-              </button>
+              <GoogleLogin
+  onSuccess={async (credentialResponse) => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: "google",
+          token: credentialResponse.credential,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Login failed");
+      const data = await res.json();
+
+      // Save the user + token in frontend
+      login("google", data);
+      onClose();
+    } catch (err) {
+      console.error("Google login error:", err);
+    }
+  }}
+  onError={() => {
+    console.log("Google Login Failed");
+  }}
+/>
+
 
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-gray-200"></div>
