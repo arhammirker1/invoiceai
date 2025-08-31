@@ -8,10 +8,7 @@ Type=simple
 User=invoiceai
 Group=invoiceai
 WorkingDirectory=/var/www/invoice-app/backend
-Environment=PATH=/var/www/invoice-app/backend/venv/bin
-Environment=PYTHONPATH=/var/www/invoice-app/backend
-Environment=C_FORCE_ROOT=1
-ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A celery_app beat --loglevel=info
+ExecStart=/bin/bash -c "source /var/www/invoice-app/backend/venv/bin/activate && exec celery -A celery_app beat --loglevel=info"
 
 Restart=always
 RestartSec=5
