@@ -77,18 +77,22 @@ const AuthModal = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
 
-  const handleGoogleLogin = () => {
-    login('google', { email: 'user@gmail.com' });
-    onClose();
+  // Fixed Google Login
+  const handleGoogleLogin = async () => {
+    setIsSubmitting(true);          // Show loading
+    await login('google', { email: 'user@gmail.com' });
+    setIsSubmitting(false);
+    onClose();                      // Close modal AFTER login
   };
 
+  // Fixed Magic Link Login
   const handleMagicLink = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     // Simulate sending magic link
-    setTimeout(() => {
+    setTimeout(async () => {
+      await login('magic-link', { email });
       setIsSubmitting(false);
-      login('magic-link', { email });
       onClose();
     }, 1500);
   };
@@ -122,11 +126,12 @@ const AuthModal = ({ isOpen, onClose }) => {
             <div className="space-y-4">
               <button
                 onClick={handleGoogleLogin}
+                disabled={isSubmitting}
                 className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl py-3 px-4 hover:border-matcha transition-colors"
                 style={{ borderColor: colors.matcha }}
               >
                 <Google size={20} />
-                Continue with Google
+                {isSubmitting ? 'Logging in...' : 'Continue with Google'}
               </button>
 
               <div className="flex items-center gap-3">
@@ -137,6 +142,7 @@ const AuthModal = ({ isOpen, onClose }) => {
 
               <button
                 onClick={() => setMode('magic-link')}
+                disabled={isSubmitting}
                 className="w-full flex items-center justify-center gap-3 rounded-xl py-3 px-4 text-white transition-colors"
                 style={{ backgroundColor: colors.matcha }}
               >
@@ -190,6 +196,7 @@ const AuthModal = ({ isOpen, onClose }) => {
     </AnimatePresence>
   );
 };
+
 
 // Landing Page Component
 const LandingPage = ({ onLogin }) => {
