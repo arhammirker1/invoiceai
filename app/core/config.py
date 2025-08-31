@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     # Authentication
     SECRET_KEY: str = "your-secret-key-change-this"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    GOOGLE_CLIENT_ID: str = "your-google-client-id"
-    GOOGLE_CLIENT_SECRET: str = "your-google-client-secret"
+    GOOGLE_CLIENT_ID: str = "782809189336-vufvfm95cumltebfifgnnlkp31529l6s.apps.googleusercontent.com"
+    GOOGLE_CLIENT_SECRET: str = "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"
     
     # Email
     SENDGRID_API_KEY: str = "your-sendgrid-api-key"
