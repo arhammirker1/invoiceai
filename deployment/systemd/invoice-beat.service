@@ -9,7 +9,6 @@ User=invoiceai
 Group=invoiceai
 WorkingDirectory=/var/www/invoice-app/backend
 Environment=PATH=/var/www/invoice-app/backend/venv/bin
-Environment=PYTHONPATH=/var/www/invoice-app/backend
 Environment=C_FORCE_ROOT=1
 
 ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A app.tasks.invoice_processor beat \
