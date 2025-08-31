@@ -8,11 +8,11 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name fatooraah.com fatooraah.com;
+    server_name fatooraah.com www.fatooraah.com;
 
     # SSL Configuration (Let's Encrypt)
     ssl_certificate /etc/letsencrypt/live/fatooraah.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yfatooraah.com/privkey.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fatooraah.com/privkey.pem;
     ssl_session_timeout 1d;
     ssl_session_cache shared:MozTLS:10m;
     ssl_session_tickets off;
