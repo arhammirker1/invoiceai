@@ -46,21 +46,40 @@ const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const login = async (method, data) => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setUser({
-        id: 1,
-        email: data.email || 'user@example.com',
-        name: 'John Doe',
-        plan: 'trial',
-        credits: 50,
-        trialEnds: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-      });
-      setLoading(false);
-    }, 1000);
-  };
+  const login = (method, data) => {
+  setLoading(true);
+
+  // save JWT if backend sends it
+  if (data.access_token) {
+    localStorage.setItem("token", data.access_token);
+  }
+
+  // save user object from backend
+  setUser(data.user || null);
+  setLoading(false);
+};
+
+const logout = () => {
+  localStorage.removeItem("token");
+  setUser(null);
+};
+
+// restore user on refresh
+useEffect(() => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to restore session");
+        return res.json();
+      })
+      .then((data) => setUser(data))
+      .catch(() => localStorage.removeItem("token"));
+  }
+}, []);
+
 
   const logout = () => setUser(null);
 
