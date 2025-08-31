@@ -10,54 +10,63 @@ from sqlalchemy import select
 from app.models.user import User
 from app.core.config import settings
 from app.services.email import EmailService
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
 
 class AuthService:
     def __init__(self):
         self.email_service = EmailService()
     
-    async def google_login(self, token: str, db: AsyncSession) -> dict:
-        # Verify Google token
-        async with AsyncOAuth2Client(
-            client_id=settings.GOOGLE_CLIENT_ID,
-            client_secret=settings.GOOGLE_CLIENT_SECRET
-        ) as client:
-            # Verify token with Google
-            resp = await client.get(
-                f'https://www.googleapis.com/oauth2/v2/userinfo?access_token={token}'
-            )
-            user_info = resp.json()
-        
-        # Find or create user
-        result = await db.execute(select(User).where(User.google_id == user_info['id']))
-        user = result.scalar_one_or_none()
-        
-        if not user:
-            user = User(
-                email=user_info['email'],
-                google_id=user_info['id'],
-                name=user_info.get('name'),
-                trial_start=datetime.utcnow(),
-                trial_end=datetime.utcnow() + timedelta(days=14),
-                credits_balance=0
-            )
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
-        
-        # Generate JWT token
-        access_token = self._create_access_token({"sub": str(user.id)})
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "name": user.name,
-                "plan": user.plan,
-                "credits": user.credits_balance
-            }
+   async def google_login(self, token: str, db: AsyncSession) -> dict:
+    try:
+        # Verify the ID token from frontend
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            requests.Request(),
+            settings.GOOGLE_CLIENT_ID
+        )
+    except Exception as e:
+        raise Exception(f"Invalid Google token: {e}")
+
+    # Extract the user info
+    user_info = {
+        "id": idinfo["sub"],
+        "email": idinfo["email"],
+        "name": idinfo.get("name")
+    }
+
+    # Find or create user in DB
+    result = await db.execute(select(User).where(User.google_id == user_info['id']))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        user = User(
+            email=user_info['email'],
+            google_id=user_info['id'],
+            name=user_info.get('name'),
+            trial_start=datetime.utcnow(),
+            trial_end=datetime.utcnow() + timedelta(days=14),
+            credits_balance=0
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    # Generate JWT for your app
+    access_token = self._create_access_token({"sub": str(user.id)})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "plan": user.plan,
+            "credits": user.credits_balance
         }
+    }
     
     async def send_magic_link(self, email: str, db: AsyncSession) -> dict:
         # Find or create user
