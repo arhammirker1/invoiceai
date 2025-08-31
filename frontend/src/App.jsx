@@ -71,13 +71,15 @@ const AuthProvider = ({ children }) => {
 };
 
 // Auth Modal Component
+import { GoogleLogin } from "@react-oauth/google";
+
 const AuthModal = ({ isOpen, onClose }) => {
   const [mode, setMode] = useState('login'); // 'login' or 'magic-link'
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
 
-  import { GoogleLogin } from "@react-oauth/google";
+
 
 <GoogleLogin
   onSuccess={async (credentialResponse) => {
