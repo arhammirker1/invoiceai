@@ -77,10 +77,35 @@ const AuthModal = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
 
-  const handleGoogleLogin = () => {
-    login('google', { email: 'user@gmail.com' });
-    onClose();
-  };
+  import { GoogleLogin } from "@react-oauth/google";
+
+<GoogleLogin
+  onSuccess={async (credentialResponse) => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: "google",
+          token: credentialResponse.credential,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Login failed");
+      const data = await res.json();
+
+      // Save user in frontend
+      login("google", data);
+      onClose();
+    } catch (err) {
+      console.error("Google login error:", err);
+    }
+  }}
+  onError={() => {
+    console.log("Google Login Failed");
+  }}
+/>
+
 
   const handleMagicLink = async (e) => {
     e.preventDefault();
