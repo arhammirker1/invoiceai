@@ -10,6 +10,7 @@ Group=invoiceai
 WorkingDirectory=/var/www/invoice-app/backend
 Environment=PATH=/var/www/invoice-app/backend/venv/bin
 Environment=C_FORCE_ROOT=1
+Environment=DJANGO_SETTINGS_MODULE=app.core.settings 
 ExecStart=/var/www/invoice-app/backend/venv/bin/celery -A app.tasks.invoice_processor beat --loglevel=info
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
