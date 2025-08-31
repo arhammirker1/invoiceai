@@ -3,7 +3,7 @@
 
 import os
 import asyncio
-from celery import Celery
+
 from pathlib import Path
 import pdfplumber
 import camelot
@@ -16,6 +16,8 @@ from openpyxl.drawing import image
 import re
 from datetime import datetime
 from decimal import Decimal
+from app.core.config import settings   
+from celery import Celery
 
 celery_app = Celery('invoice_processor', broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 
