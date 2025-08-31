@@ -103,16 +103,33 @@ const AuthModal = ({ isOpen, onClose }) => {
 
 
 
-  const handleMagicLink = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    // Simulate sending magic link
-    setTimeout(() => {
-      setIsSubmitting(false);
-      login('magic-link', { email });
-      onClose();
-    }, 1500);
-  };
+const handleMagicLink = async (e) => {
+  e.preventDefault();
+  setIsSubmitting(true);
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "magic_link",
+        email,
+      }),
+    });
+
+    if (!res.ok) throw new Error("Failed to send magic link");
+    const data = await res.json();
+
+    // backend usually just sends { message: "Magic link sent" }
+    alert(data.message || "Magic link sent! Check your email.");
+    onClose();
+  } catch (err) {
+    console.error("Magic link error:", err);
+    alert("Error sending magic link.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   if (!isOpen) return null;
 
