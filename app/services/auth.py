@@ -18,55 +18,55 @@ class AuthService:
     def __init__(self):
         self.email_service = EmailService()
     
-   async def google_login(self, token: str, db: AsyncSession) -> dict:
-    try:
-        # Verify the ID token from frontend
-        idinfo = id_token.verify_oauth2_token(
-            token,
-            requests.Request(),
-            settings.GOOGLE_CLIENT_ID
-        )
-    except Exception as e:
-        raise Exception(f"Invalid Google token: {e}")
+    async def google_login(self, token: str, db: AsyncSession) -> dict:
+        try:
+            # Verify the ID token from frontend
+            idinfo = id_token.verify_oauth2_token(
+                token,
+                requests.Request(),
+                settings.GOOGLE_CLIENT_ID
+            )
+         except Exception as e:
+             raise Exception(f"Invalid Google token: {e}")
 
-    # Extract the user info
-    user_info = {
-        "id": idinfo["sub"],
-        "email": idinfo["email"],
-        "name": idinfo.get("name")
-    }
+         # Extract the user info
+         user_info = {
+             "id": idinfo["sub"],
+             "email": idinfo["email"],
+             "name": idinfo.get("name")
+         }
 
-    # Find or create user in DB
-    result = await db.execute(select(User).where(User.google_id == user_info['id']))
-    user = result.scalar_one_or_none()
+         # Find or create user in DB
+         result = await db.execute(select(User).where(User.google_id == user_info['id']))
+         user = result.scalar_one_or_none()
 
-    if not user:
-        user = User(
-            email=user_info['email'],
-            google_id=user_info['id'],
-            name=user_info.get('name'),
-            trial_start=datetime.utcnow(),
-            trial_end=datetime.utcnow() + timedelta(days=14),
-            credits_balance=0
-        )
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
+         if not user:
+             user = User(
+                 email=user_info['email'],
+                 google_id=user_info['id'],
+                 name=user_info.get('name'),
+                 trial_start=datetime.utcnow(),
+                 trial_end=datetime.utcnow() + timedelta(days=14),
+                 credits_balance=0
+             )
+             db.add(user)
+             await db.commit()
+             await db.refresh(user)
 
-    # Generate JWT for your app
-    access_token = self._create_access_token({"sub": str(user.id)})
+        # Generate JWT for your app
+        access_token = self._create_access_token({"sub": str(user.id)})
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "name": user.name,
-            "plan": user.plan,
-            "credits": user.credits_balance
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "plan": user.plan,
+                "credits": user.credits_balance
+            }
         }
-    }
     
     async def send_magic_link(self, email: str, db: AsyncSession) -> dict:
         # Find or create user
