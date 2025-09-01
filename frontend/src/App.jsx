@@ -14,7 +14,7 @@ import {
   BarChart3,
   X,
   Mail,
-  Google,
+  Chrome,
   Sparkles,
   ArrowRight,
   File,
