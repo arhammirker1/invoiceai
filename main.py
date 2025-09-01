@@ -13,6 +13,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import redis.asyncio as redis
 from celery import Celery
+import logging
+from datetime import datetime
+from fastapi.responses import JSONResponse
+
+
+from app.core.config import settings
+from app.core.database import get_db, init_db
+from app.models.user import User
+from app.models.invoice import Invoice, InvoiceStatus
+from app.services.auth import AuthService
+from app.services.storage import StorageService
+from app.services.email import EmailService
+from app.services.payment import PaymentService
+from app.tasks.invoice_processor import process_invoice_task
+from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.invoice import InvoiceResponse, InvoiceUploadResponse
+from app.schemas.user import UserResponse
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 # Initialize Celery app (add this before the FastAPI app creation)
 celery_app = Celery(
@@ -30,22 +52,6 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
 )
-
-
-from app.core.config import settings
-from app.core.database import get_db, init_db
-from app.models.user import User
-from app.models.invoice import Invoice, InvoiceStatus
-from app.services.auth import AuthService
-from app.services.storage import StorageService
-from app.services.email import EmailService
-from app.services.payment import PaymentService
-from app.tasks.invoice_processor import process_invoice_task
-from app.schemas.auth import LoginRequest, TokenResponse
-from app.schemas.invoice import InvoiceResponse, InvoiceUploadResponse
-from app.schemas.user import UserResponse
-from celery import Celery
-
 
 # Initialize Redis and Celery
 redis_client = redis.from_url(settings.REDIS_URL)
@@ -71,8 +77,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"]
+
 )
 
 # Security
@@ -95,26 +103,55 @@ async def get_current_user(
 # ============================================================================
 # Authentication Endpoints
 # ============================================================================
-
-@app.post("/api/auth/login", response_model=TokenResponse)
+@app.post("/api/auth/login")
 async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
-    auth_service = AuthService()
-    
-    if request.provider == "google":
-        return await auth_service.google_login(request.token, db)
-    elif request.provider == "magic_link":
-        return await auth_service.send_magic_link(request.email, db)
-    
-    raise HTTPException(status_code=400, detail="Invalid login provider")
+    """Handle login requests (Google OAuth or Magic Link)"""
+    try:
+        logger.info(f"Login attempt with provider: {request.provider}")
+        auth_service = AuthService()
+        
+        if request.provider == "google":
+            if not request.token:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Google token is required"
+                )
+            
+            logger.info("Processing Google login...")
+            result = await auth_service.google_login(request.token, db)
+            logger.info(f"Google login successful for user: {result['user']['email']}")
+            
+            # Return the result directly - it already matches TokenResponse schema
+            return result
+            
+        elif request.provider == "magic_link":
+            if not request.email:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Email is required for magic link"
+                )
+            
+            logger.info(f"Sending magic link to: {request.email}")
+            result = await auth_service.send_magic_link(request.email, db)
+            
+            # For magic link, return a different response since no token is generated yet
+            return JSONResponse(content=result)
+            
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid provider. Must be 'google' or 'magic_link'"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Authentication failed: {str(e)}"
+        )
 
-@app.post("/api/auth/verify-magic-link")
-async def verify_magic_link(token: str, db: AsyncSession = Depends(get_db)):
-    auth_service = AuthService()
-    return await auth_service.verify_magic_link(token, db)
-
-@app.get("/api/auth/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    return UserResponse.from_orm(current_user)
 
 # ============================================================================
 # Invoice Processing Endpoints
