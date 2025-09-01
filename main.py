@@ -151,7 +151,9 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
             status_code=500, 
             detail=f"Authentication failed: {str(e)}"
         )
-
+@app.options("/api/auth/login")
+async def options_login():
+    return {"message": "OK"}
 
 # ============================================================================
 # Invoice Processing Endpoints
