@@ -66,6 +66,13 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
+
+@app.middleware("http")
+async def add_coop_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    return response
+
 # Security
 security = HTTPBearer()
 
