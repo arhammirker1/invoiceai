@@ -123,53 +123,46 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Handle login requests (Google OAuth or Magic Link)"""
     try:
         logger.info(f"🔐 Login attempt with provider: {request.provider}")
-        logger.info(f"Request data: provider={request.provider}, has_token={bool(request.token)}, email={request.email}")
         
+        # Create auth service instance
         auth_service = AuthService()
         
         if request.provider == "google":
             if not request.token:
-                logger.error("❌ No Google token provided")
                 raise HTTPException(
                     status_code=400, 
                     detail="Google token is required"
                 )
             
-            logger.info("🔄 Processing Google login...")
             result = await auth_service.google_login(request.token, db)
-            logger.info(f"✅ Google login successful for user: {result['user']['email']}")
-            
             return result
             
         elif request.provider == "magic_link":
             if not request.email:
-                logger.error("❌ No email provided for magic link")
                 raise HTTPException(
                     status_code=400, 
                     detail="Email is required for magic link"
                 )
             
-            logger.info(f"📧 Sending magic link to: {request.email}")
             result = await auth_service.send_magic_link(request.email, db)
-            
-            return JSONResponse(content=result)
+            return result
             
         else:
-            logger.error(f"❌ Invalid provider: {request.provider}")
             raise HTTPException(
                 status_code=400, 
-                detail="Invalid provider. Must be 'google' or 'magic_link'"
+                detail="Invalid provider"
             )
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Login error: {e}")
+        logger.error(f"❌ Login error: {str(e)}")
         logger.error(f"Full traceback: {traceback.format_exc()}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Authentication failed: {str(e)}"
+        return JSONResponse(
+            status_code=999,
+            content={"detail": f"Authentication failed: {str(e)}"}
         )
+   
 
 @app.get("/api/auth/verify")
 async def verify_magic_link(
