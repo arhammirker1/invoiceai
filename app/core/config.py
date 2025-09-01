@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Redis & Celery
     REDIS_URL: str = "redis://localhost:6379/0"
-    
+    FRONTEND_URL: str = "https://fatooraah.com"  
     # Authentication
     SECRET_KEY: str = "your-secret-key-change-this"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     EXCEL_DIR: str = "/var/www/invoice-app/storage/excels"
     
     # CORS
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "https://fatooraah.com"]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "https://fatooraah.com","https://www.fatooraah.com"]
     
     class Config:
         env_file = ".env"
