@@ -2,18 +2,15 @@
 # ============================================================================
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 import jwt
+import httpx
+import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
 from app.core.config import settings
 from app.services.email import EmailService
-from google.oauth2 import id_token
-from google.auth.transport import requests
-import httpx
-import json
-
 
 class AuthService:
     def __init__(self):
@@ -22,35 +19,14 @@ class AuthService:
     async def google_login(self, token: str, db: AsyncSession) -> dict:
         """Handle Google OAuth login with proper error handling"""
         try:
-            # Method 1: Verify using Google's library (recommended)
-            try:
-                idinfo = id_token.verify_oauth2_token(
-                    token,
-                    requests.Request(),
-                    settings.GOOGLE_CLIENT_ID
-                )
-                
-                # Check if token is for your app
-                if idinfo['aud'] != settings.GOOGLE_CLIENT_ID:
-                    raise ValueError('Wrong audience')
-                    
-            except Exception as e:
-                print(f"Google library verification failed: {e}")
-                # Method 2: Fallback to Google's tokeninfo endpoint
-                idinfo = await self._verify_token_with_google_api(token)
-        
-            # Extract user info
-            user_info = {
-                "id": idinfo["sub"],
-                "email": idinfo["email"],
-                "name": idinfo.get("name", ""),
-                "picture": idinfo.get("picture")
-            }
+            print(f"Received Google token: {token[:50]}...")
             
+            # Verify token using Google's tokeninfo endpoint
+            user_info = await self._verify_google_token(token)
             print(f"Google user info: {user_info}")
 
             # Find existing user by Google ID first
-            result = await db.execute(select(User).where(User.google_id == user_info['id']))
+            result = await db.execute(select(User).where(User.google_id == user_info['sub']))
             user = result.scalar_one_or_none()
             
             # If no user found by Google ID, try by email
@@ -60,18 +36,19 @@ class AuthService:
                 
                 # Update existing user with Google ID if found
                 if user:
-                    user.google_id = user_info['id']
-                    if not user.name:
-                        user.name = user_info.get('name')
+                    user.google_id = user_info['sub']
+                    if not user.name and user_info.get('name'):
+                        user.name = user_info['name']
 
             # Create new user if none exists
             if not user:
+                trial_end = datetime.utcnow() + timedelta(days=14)
                 user = User(
                     email=user_info['email'],
-                    google_id=user_info['id'],
+                    google_id=user_info['sub'],
                     name=user_info.get('name', ''),
                     trial_start=datetime.utcnow(),
-                    trial_end=datetime.utcnow() + timedelta(days=14),
+                    trial_end=trial_end,
                     credits_balance=50,  # Free trial credits
                     plan="trial"
                 )
@@ -103,23 +80,46 @@ class AuthService:
             print(f"Google login error: {e}")
             raise Exception(f"Authentication failed: {str(e)}")
     
-    async def _verify_token_with_google_api(self, token: str) -> dict:
-        """Verify token using Google's tokeninfo API as fallback"""
+    async def _verify_google_token(self, token: str) -> Dict[str, Any]:
+        """Verify Google ID token using Google's tokeninfo API"""
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
-            )
-            
-            if response.status_code != 200:
-                raise Exception("Invalid token from Google API")
+            try:
+                # Use Google's tokeninfo endpoint to verify the token
+                response = await client.get(
+                    f"https://oauth2.googleapis.com/tokeninfo?id_token={token}",
+                    timeout=10.0
+                )
                 
-            data = response.json()
-            
-            # Verify audience
-            if data.get('aud') != settings.GOOGLE_CLIENT_ID:
-                raise Exception("Token audience mismatch")
+                if response.status_code != 200:
+                    error_detail = response.text
+                    print(f"Google API error response: {error_detail}")
+                    raise Exception(f"Google token verification failed: {error_detail}")
                 
-            return data
+                user_info = response.json()
+                
+                # Verify the token is for your app
+                if user_info.get('aud') != settings.GOOGLE_CLIENT_ID:
+                    raise Exception(f"Token audience mismatch. Expected: {settings.GOOGLE_CLIENT_ID}, Got: {user_info.get('aud')}")
+                
+                # Check if token is expired
+                exp = int(user_info.get('exp', 0))
+                if exp < datetime.utcnow().timestamp():
+                    raise Exception("Token has expired")
+                
+                # Return verified user info
+                return {
+                    'sub': user_info['sub'],
+                    'email': user_info['email'],
+                    'name': user_info.get('name', ''),
+                    'picture': user_info.get('picture')
+                }
+                
+            except httpx.TimeoutException:
+                raise Exception("Google API timeout - please try again")
+            except httpx.RequestError as e:
+                raise Exception(f"Network error contacting Google: {str(e)}")
+            except json.JSONDecodeError:
+                raise Exception("Invalid response from Google API")
     
     async def send_magic_link(self, email: str, db: AsyncSession) -> dict:
         """Send magic link for email authentication"""
@@ -129,10 +129,11 @@ class AuthService:
             user = result.scalar_one_or_none()
             
             if not user:
+                trial_end = datetime.utcnow() + timedelta(days=14)
                 user = User(
                     email=email,
                     trial_start=datetime.utcnow(),
-                    trial_end=datetime.utcnow() + timedelta(days=14),
+                    trial_end=trial_end,
                     credits_balance=50,
                     plan="trial"
                 )
@@ -215,88 +216,3 @@ class AuthService:
             return result.scalar_one_or_none()
         except jwt.PyJWTError:
             return None
-
-
-# API Routes - Add these to your FastAPI router
-# ============================================================================
-
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
-from app.services.auth import AuthService
-from app.schemas.auth import LoginRequest, TokenResponse, UserResponse
-
-router = APIRouter(prefix="/api/auth", tags=["auth"])
-security = HTTPBearer()
-auth_service = AuthService()
-
-@router.post("/login", response_model=TokenResponse)
-async def login(
-    request: LoginRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    """Handle login requests (Google OAuth or Magic Link)"""
-    try:
-        if request.provider == "google":
-            if not request.token:
-                raise HTTPException(
-                    status_code=400, 
-                    detail="Google token is required"
-                )
-            
-            result = await auth_service.google_login(request.token, db)
-            return result
-            
-        elif request.provider == "magic_link":
-            if not request.email:
-                raise HTTPException(
-                    status_code=400, 
-                    detail="Email is required for magic link"
-                )
-            
-            result = await auth_service.send_magic_link(request.email, db)
-            return result
-            
-        else:
-            raise HTTPException(
-                status_code=400, 
-                detail="Invalid provider"
-            )
-            
-    except Exception as e:
-        print(f"Login error: {e}")
-        raise HTTPException(
-            status_code=400, 
-            detail=str(e)
-        )
-
-@router.get("/verify")
-async def verify_magic_link(
-    token: str,
-    db: AsyncSession = Depends(get_db)
-):
-    """Verify magic link token"""
-    try:
-        result = await auth_service.verify_magic_link(token, db)
-        return result
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
-
-@router.get("/me", response_model=UserResponse)
-async def get_current_user_info(
-    token: str = Depends(security),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get current user information"""
-    user = await auth_service.get_current_user(token.credentials, db)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired token"
-        )
-    
-    return UserResponse.from_orm(user)
