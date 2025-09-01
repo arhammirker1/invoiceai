@@ -75,26 +75,144 @@ const AuthModal = ({ isOpen, onClose }) => {
   const [mode, setMode] = useState('login'); // 'login' or 'magic-link'
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const { login } = useAuth();
 
-  // Fixed Google Login
-  const handleGoogleLogin = async () => {
-    setIsSubmitting(true);          // Show loading
-    await login('google', { email: 'user@gmail.com' });
-    setIsSubmitting(false);
-    onClose();                      // Close modal AFTER login
+  // Load Google Identity Services
+  useEffect(() => {
+    if (isOpen && !window.google) {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = initializeGoogle;
+      document.head.appendChild(script);
+    } else if (isOpen && window.google) {
+      initializeGoogle();
+    }
+  }, [isOpen]);
+
+  const initializeGoogle = () => {
+    if (window.google) {
+      window.google.accounts.id.initialize({
+        client_id: '782809189336-vufvfm95cumltebfifgnnlkp31529l6s.apps.googleusercontent.com',
+        callback: handleGoogleResponse,
+        auto_select: false,
+        cancel_on_tap_outside: false
+      });
+    }
+  };
+
+  const handleGoogleResponse = async (response) => {
+    try {
+      setIsSubmitting(true);
+      setError('');
+      
+      console.log('Google credential received:', response.credential);
+      
+      // Send the credential (ID token) to your backend
+      const apiResponse = await fetch('https://fatooraah.com/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'google',
+          token: response.credential
+        })
+      });
+
+      const data = await apiResponse.json();
+      
+      if (!apiResponse.ok) {
+        throw new Error(data.detail || 'Authentication failed');
+      }
+
+      console.log('Backend response:', data);
+      
+      // Store the token and user data
+      localStorage.setItem('access_token', data.access_token);
+      
+      // Update auth context
+      await login('google', { email: data.user.email });
+      
+      onClose();
+    } catch (error) {
+      console.error('Google login error:', error);
+      setError(error.message || 'Authentication failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    if (window.google) {
+      setError('');
+      setIsSubmitting(true);
+      
+      // Trigger Google One Tap or render sign-in button
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          // If One Tap fails, show the sign-in button
+          setIsSubmitting(false);
+          renderGoogleButton();
+        }
+      });
+    } else {
+      setError('Google Sign-In is not loaded. Please refresh and try again.');
+    }
+  };
+
+  const renderGoogleButton = () => {
+    if (window.google) {
+      // Clear any existing button
+      const buttonDiv = document.getElementById('google-signin-button');
+      if (buttonDiv) {
+        buttonDiv.innerHTML = '';
+        
+        window.google.accounts.id.renderButton(buttonDiv, {
+          theme: 'outline',
+          size: 'large',
+          width: '100%',
+          text: 'continue_with'
+        });
+      }
+    }
   };
 
   // Fixed Magic Link Login
   const handleMagicLink = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Simulate sending magic link
-    setTimeout(async () => {
-      await login('magic-link', { email });
-      setIsSubmitting(false);
+    setError('');
+    
+    try {
+      const response = await fetch('https://fatooraah.com/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'magic_link',
+          email: email
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to send magic link');
+      }
+
+      // Show success message
+      alert('Magic link sent to your email! Check your inbox.');
       onClose();
-    }, 1500);
+    } catch (error) {
+      console.error('Magic link error:', error);
+      setError(error.message || 'Failed to send magic link. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -122,17 +240,25 @@ const AuthModal = ({ isOpen, onClose }) => {
             </button>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
+
           {mode === 'login' ? (
             <div className="space-y-4">
               <button
                 onClick={handleGoogleLogin}
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl py-3 px-4 hover:border-matcha transition-colors"
-                style={{ borderColor: colors.matcha }}
+                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl py-3 px-4 hover:border-green-400 transition-colors disabled:opacity-50"
               >
                 <Google size={20} />
-                {isSubmitting ? 'Logging in...' : 'Continue with Google'}
+                {isSubmitting ? 'Signing in...' : 'Continue with Google'}
               </button>
+              
+              {/* Google Sign-In button container */}
+              <div id="google-signin-button" className="w-full"></div>
 
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-gray-200"></div>
@@ -143,8 +269,7 @@ const AuthModal = ({ isOpen, onClose }) => {
               <button
                 onClick={() => setMode('magic-link')}
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-3 rounded-xl py-3 px-4 text-white transition-colors"
-                style={{ backgroundColor: colors.matcha }}
+                className="w-full flex items-center justify-center gap-3 bg-green-500 text-white rounded-xl py-3 px-4 hover:bg-green-600 transition-colors disabled:opacity-50"
               >
                 <Mail size={20} />
                 Continue with Email
@@ -160,7 +285,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-matcha focus:border-transparent outline-none"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                   placeholder="Enter your email"
                   required
                 />
@@ -168,9 +293,8 @@ const AuthModal = ({ isOpen, onClose }) => {
               
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full rounded-xl py-3 px-4 text-white font-medium transition-colors disabled:opacity-50"
-                style={{ backgroundColor: colors.matcha }}
+                disabled={isSubmitting || !email}
+                className="w-full bg-green-500 text-white rounded-xl py-3 px-4 font-medium transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <div className="flex items-center justify-center gap-2">
@@ -196,6 +320,8 @@ const AuthModal = ({ isOpen, onClose }) => {
     </AnimatePresence>
   );
 };
+  
+              
 
 
 // Landing Page Component
