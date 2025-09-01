@@ -22,4 +22,4 @@ PyMuPDF==1.23.1
 google-auth==2.23.3
 google-auth-oauthlib==1.1.0
 google-auth-oauthlib==1.1.0
-httpx==0.25.0
+httpx==0.28.0
