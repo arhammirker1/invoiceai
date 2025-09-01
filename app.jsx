@@ -130,11 +130,8 @@ const AuthModal = ({ isOpen, onClose }) => {
 
       console.log('Backend response:', data);
       
-      // Store the token and user data
-      localStorage.setItem('access_token', data.access_token);
-      
-      // Update auth context
-      await login('google', { email: data.user.email });
+      // Update auth context with real user data
+      login('google', data.user);
       
       onClose();
     } catch (error) {
@@ -251,7 +248,8 @@ const AuthModal = ({ isOpen, onClose }) => {
               <button
                 onClick={handleGoogleLogin}
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl py-3 px-4 hover:border-green-400 transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl py-3 px-4 hover:border-matcha transition-colors disabled:opacity-50"
+                style={{ borderColor: isSubmitting ? colors.matcha : '#e5e7eb' }}
               >
                 <Google size={20} />
                 {isSubmitting ? 'Signing in...' : 'Continue with Google'}
@@ -269,7 +267,8 @@ const AuthModal = ({ isOpen, onClose }) => {
               <button
                 onClick={() => setMode('magic-link')}
                 disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-3 bg-green-500 text-white rounded-xl py-3 px-4 hover:bg-green-600 transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-3 rounded-xl py-3 px-4 text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: colors.matcha }}
               >
                 <Mail size={20} />
                 Continue with Email
@@ -285,7 +284,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-matcha focus:border-transparent outline-none"
                   placeholder="Enter your email"
                   required
                 />
@@ -294,7 +293,8 @@ const AuthModal = ({ isOpen, onClose }) => {
               <button
                 type="submit"
                 disabled={isSubmitting || !email}
-                className="w-full bg-green-500 text-white rounded-xl py-3 px-4 font-medium transition-colors disabled:opacity-50"
+                className="w-full rounded-xl py-3 px-4 text-white font-medium transition-colors disabled:opacity-50"
+                style={{ backgroundColor: colors.matcha }}
               >
                 {isSubmitting ? (
                   <div className="flex items-center justify-center gap-2">
@@ -320,6 +320,7 @@ const AuthModal = ({ isOpen, onClose }) => {
     </AnimatePresence>
   );
 };
+  
   
               
 
