@@ -622,13 +622,6 @@ const UploadPage = ({ onNavigate }) => {
               Drop up to 100 files or click to select. Supports PDF, JPG, PNG formats.
             </p>
           </div>
-          <button
-            onClick={() => logout(onNavigate)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-          >
-            <LogOut size={16} />
-            Logout
-          </button>
         </motion.div>
 
         {/* Upload Area */}
@@ -840,13 +833,6 @@ const Dashboard = ({ onNavigate }) => {
             >
               {user?.credits || 50} credits
             </div>
-            <button
-              onClick={() => logout(onNavigate)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
           </div>
         </motion.div>
 
@@ -1003,6 +989,11 @@ const InvoiceAI = () => {
   // Navigation Component
   const Navigation = () => {
     if (!user) return null;
+    
+    const handleLogout = () => {
+      logout();
+      setCurrentPage('landing');
+    };
 
     return (
       <nav className="bg-white shadow-sm border-b border-gray-100 fixed top-0 left-0 right-0 z-50">
@@ -1057,7 +1048,7 @@ const InvoiceAI = () => {
                 </button>
               </div>
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600"
               >
                 <LogOut size={16} />
@@ -1071,7 +1062,9 @@ const InvoiceAI = () => {
 
   return (
     <div className="min-h-screen">
-      <AnimatePresence mode="wait">
+      <Navigation />
+      <div className="pt-12">
+        <AnimatePresence mode="wait">
         {currentPage === 'landing' && !user && (
           <motion.div
             key="landing"
@@ -1104,7 +1097,8 @@ const InvoiceAI = () => {
             <Dashboard onNavigate={handleNavigation} />
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
 
       <AuthModal 
         isOpen={showAuthModal} 
