@@ -60,9 +60,13 @@ const AuthProvider = ({ children }) => {
     setLoading(false);
   };
 
-  const logout = () => {
+  const logout = (navigateToHome) => {
     setAuthToken(null);
     setUser(null);
+    // Navigate to home page after logout
+    if (navigateToHome) {
+      navigateToHome('landing');
+    }
   };
 
   // In a real app, you would restore user session from localStorage or sessionStorage
@@ -93,9 +97,11 @@ const AuthModal = ({ isOpen, onClose }) => {
     
     try {
       console.log('Google credential received:', credentialResponse);
+      console.log('Current URL:', window.location.origin);
+      console.log('Making request to:', "http://localhost:8000/api/auth/login");
       
-      // In production, this would call your backend
-      const response = await fetch("/api/auth/login", {
+      // Call your backend with Google token
+      const response = await fetch("http://localhost:8000/api/auth/login", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -123,29 +129,28 @@ const AuthModal = ({ isOpen, onClose }) => {
     } catch (err) {
       console.error("Google login error:", err);
       setAuthError(`Authentication failed: ${err.message}`);
-      
-      // For demo purposes, simulate successful login
-      setTimeout(() => {
-        login("google", {
-          access_token: "demo_token_" + Date.now(),
-          user: {
-            id: 1,
-            email: "demo@example.com",
-            name: "Demo User",
-            plan: "trial",
-            credits: 50
-          }
-        });
-        onClose();
-      }, 1000);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleGoogleError = () => {
-    console.log("Google Login Failed");
-    setAuthError("Google login was cancelled or failed");
+  const handleGoogleError = (error) => {
+    console.log("Google Login Failed:", error);
+    console.log("Current URL:", window.location.origin);
+    console.log("Google Client ID:", "782809189336-vufvfm95cumltebfifgnnlkp31529l6s.apps.googleusercontent.com");
+    
+    let errorMessage = "Google login failed. ";
+    if (error?.error === 'popup_closed_by_user') {
+      errorMessage += "Login was cancelled.";
+    } else if (error?.error === 'access_denied') {
+      errorMessage += "Access was denied.";
+    } else if (error?.error === 'origin_mismatch') {
+      errorMessage += "Origin mismatch - please add this URL to Google Console: " + window.location.origin;
+    } else {
+      errorMessage += `${error?.error || 'Unknown error'}. Try demo login instead.`;
+    }
+    
+    setAuthError(errorMessage);
   };
 
   const handleMagicLink = async (e) => {
@@ -154,7 +159,7 @@ const AuthModal = ({ isOpen, onClose }) => {
     setIsSubmitting(true);
     
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("http://localhost:8000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -226,6 +231,29 @@ const AuthModal = ({ isOpen, onClose }) => {
                   auto_select={false}
                   disabled={isSubmitting}
                 />
+              </div>
+              
+              {/* Demo Login Option */}
+              <div className="mt-4">
+                <button
+                  onClick={() => {
+                    // Demo login for testing
+                    login("mock", {
+                      access_token: "demo_token_" + Date.now(),
+                      user: {
+                        id: 1,
+                        email: "demo@example.com",
+                        name: "Demo User",
+                        plan: "trial",
+                        credits: 50
+                      }
+                    });
+                    onClose();
+                  }}
+                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors border border-gray-300"
+                >
+                  Try Demo Login
+                </button>
               </div>
 
               {isSubmitting && (
@@ -305,7 +333,7 @@ const LandingPage = ({ onLogin }) => {
   return (
     <div className="min-h-screen" style={{ backgroundColor: colors.cream }}>
       {/* Navigation */}
-      <nav className="flex justify-between items-center p-6 md:p-8">
+      <nav className="flex justify-between items-center p-4 md:p-6">
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -326,7 +354,7 @@ const LandingPage = ({ onLogin }) => {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           onClick={onLogin}
-          className="px-6 py-2 rounded-lg text-white font-medium hover:scale-105 transition-transform"
+          className="px-4 py-2 rounded-lg text-white font-medium hover:scale-105 transition-transform text-sm"
           style={{ backgroundColor: colors.matcha }}
         >
           Sign In
@@ -540,7 +568,8 @@ const LandingPage = ({ onLogin }) => {
 };
 
 // Upload Page Component
-const UploadPage = () => {
+const UploadPage = ({ onNavigate }) => {
+  const { logout } = useAuth();
   const [files, setFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -583,14 +612,23 @@ const UploadPage = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          className="flex justify-between items-center mb-8"
         >
-          <h1 className="text-3xl font-bold mb-2" style={{ color: colors.text }}>
-            Upload Your Invoices
-          </h1>
-          <p style={{ color: colors.textLight }}>
-            Drop up to 100 files or click to select. Supports PDF, JPG, PNG formats.
-          </p>
+          <div className="text-center flex-1">
+            <h1 className="text-3xl font-bold mb-2" style={{ color: colors.text }}>
+              Upload Your Invoices
+            </h1>
+            <p style={{ color: colors.textLight }}>
+              Drop up to 100 files or click to select. Supports PDF, JPG, PNG formats.
+            </p>
+          </div>
+          <button
+            onClick={() => logout(onNavigate)}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
         </motion.div>
 
         {/* Upload Area */}
@@ -730,8 +768,8 @@ const UploadPage = () => {
 };
 
 // Dashboard Component
-const Dashboard = () => {
-  const { user } = useAuth();
+const Dashboard = ({ onNavigate }) => {
+  const { user, logout } = useAuth();
   const [invoices] = useState([
     {
       id: 1,
@@ -802,6 +840,13 @@ const Dashboard = () => {
             >
               {user?.credits || 50} credits
             </div>
+            <button
+              onClick={() => logout(onNavigate)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
           </div>
         </motion.div>
 
@@ -906,13 +951,46 @@ const Dashboard = () => {
 const InvoiceAI = () => {
   const [currentPage, setCurrentPage] = useState('landing');
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, login } = useAuth();
 
   useEffect(() => {
     if (user && currentPage === 'landing') {
       setCurrentPage('dashboard');
     }
   }, [user, currentPage]);
+
+  // Handle magic link verification
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    
+    if (token) {
+      // Verify the magic link token
+      verifyMagicLink(token);
+    }
+  }, []);
+
+  const verifyMagicLink = async (token) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/auth/verify?token=${token}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Login the user with the magic link data
+        await login('magic_link', data);
+        
+        // Clean up the URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Navigate to dashboard
+        setCurrentPage('dashboard');
+      } else {
+        console.error('Magic link verification failed:', data);
+      }
+    } catch (error) {
+      console.error('Magic link verification error:', error);
+    }
+  };
 
   const handleNavigation = (page) => {
     setCurrentPage(page);
@@ -927,26 +1005,26 @@ const InvoiceAI = () => {
     if (!user) return null;
 
     return (
-      <nav className="bg-white shadow-sm border-b border-gray-100">
+      <nav className="bg-white shadow-sm border-b border-gray-100 fixed top-0 left-0 right-0 z-50">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex justify-between items-center h-12">
             <div className="flex items-center gap-8">
               <div className="flex items-center gap-2">
                 <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  className="w-6 h-6 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: colors.matcha }}
                 >
-                  <Sparkles size={20} className="text-white" />
+                  <Sparkles size={16} className="text-white" />
                 </div>
-                <span className="text-xl font-bold" style={{ color: colors.text }}>
+                <span className="text-lg font-bold" style={{ color: colors.text }}>
                   InvoiceAI
                 </span>
               </div>
               
-              <div className="flex gap-6">
+              <div className="flex gap-4">
                 <button
                   onClick={() => handleNavigation('dashboard')}
-                  className={`px-3 py-2 rounded-lg transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg transition-colors text-sm ${
                     currentPage === 'dashboard' ? 'text-white' : 'text-gray-600 hover:text-gray-900'
                   }`}
                   style={{ 
@@ -957,7 +1035,7 @@ const InvoiceAI = () => {
                 </button>
                 <button
                   onClick={() => handleNavigation('upload')}
-                  className={`px-3 py-2 rounded-lg transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg transition-colors text-sm ${
                     currentPage === 'upload' ? 'text-white' : 'text-gray-600 hover:text-gray-900'
                   }`}
                   style={{ 
@@ -969,20 +1047,20 @@ const InvoiceAI = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="text-sm" style={{ color: colors.textLight }}>
-                {user?.credits || 50} credits remaining
+            <div className="flex items-center gap-3">
+              <div className="text-xs px-2 py-1 rounded-full bg-gray-100" style={{ color: colors.textLight }}>
+                {user?.credits || 50} credits
               </div>
               <div className="relative">
-                <button className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100">
-                  <User size={20} style={{ color: colors.text }} />
+                <button className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-gray-100">
+                  <User size={16} style={{ color: colors.text }} />
                 </button>
               </div>
               <button
                 onClick={logout}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600"
               >
-                <LogOut size={20} />
+                <LogOut size={16} />
               </button>
             </div>
           </div>
@@ -993,8 +1071,6 @@ const InvoiceAI = () => {
 
   return (
     <div className="min-h-screen">
-      <Navigation />
-      
       <AnimatePresence mode="wait">
         {currentPage === 'landing' && !user && (
           <motion.div
@@ -1014,7 +1090,7 @@ const InvoiceAI = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
           >
-            <UploadPage />
+            <UploadPage onNavigate={handleNavigation} />
           </motion.div>
         )}
         
@@ -1025,7 +1101,7 @@ const InvoiceAI = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
           >
-            <Dashboard />
+            <Dashboard onNavigate={handleNavigation} />
           </motion.div>
         )}
       </AnimatePresence>
