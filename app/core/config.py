@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     EXCEL_DIR: str = "/var/www/invoice-app/storage/excels"
     
     # CORS
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "https://fatooraah.com","https://www.fatooraah.com"]
+    ALLOWED_ORIGINS = ["*"]
     
     class Config:
         env_file = ".env"
