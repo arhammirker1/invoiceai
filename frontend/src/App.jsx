@@ -98,10 +98,10 @@ const AuthModal = ({ isOpen, onClose }) => {
     try {
       console.log('Google credential received:', credentialResponse);
       console.log('Current URL:', window.location.origin);
-      console.log('Making request to:', "http://localhost:8000/api/auth/login");
+      console.log('Making request to:', "https://fatooraah.com/api/auth/login");
       
       // Call your backend with Google token
-      const response = await fetch("http://localhost:8000/api/auth/login", {
+      const response = await fetch("https://fatooraah.com/api/auth/login", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -159,7 +159,7 @@ const AuthModal = ({ isOpen, onClose }) => {
     setIsSubmitting(true);
     
     try {
-      const res = await fetch("http://localhost:8000/api/auth/login", {
+      const res = await fetch("https://fatooraah.com/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
