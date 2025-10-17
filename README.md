@@ -1,4 +1,4 @@
-# InvoiceAI
+# InvoiceAI (In - Progress)
 
 AI-powered invoice processing application built with FastAPI.
 
