@@ -1,7 +1,7 @@
 [Unit]
 Description=InvoiceAI FastAPI Backend
-After=network.target postgresql.service redis.service
-Requires=postgresql.service redis.service
+After=network.target postgresql.service
+Requires=postgresql.service
 
 [Service]
 Type=exec
