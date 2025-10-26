@@ -587,24 +587,53 @@ const UploadPage = ({ onNavigate }) => {
     setFiles(prev => [...prev, ...selectedFiles.slice(0, 100 - prev.length)]);
   };
 
-  const startUpload = () => {
-    if (files.length === 0) return;
+  const { authToken } = useAuth(); // Add this at the top of UploadPage component
+
+const startUpload = async () => {
+  if (files.length === 0) return;
+  
+  setIsUploading(true);
+  setUploadProgress(0);
+  
+  try {
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', file);
+    });
     
-    setIsUploading(true);
+    const response = await fetch('https://fatooraah.com/api/invoices/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error('Upload failed');
+    }
+    
+    const result = await response.json();
+    console.log('Upload successful:', result);
+    
+    // Simulate progress completion
+    setUploadProgress(100);
+    
+    // Clear files and redirect to dashboard after 1 second
+    setTimeout(() => {
+      setIsUploading(false);
+      setFiles([]);
+      alert(`${result.length} invoices uploaded successfully! Check dashboard for status.`);
+      onNavigate('dashboard');
+    }, 1000);
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    alert('Upload failed: ' + error.message);
+    setIsUploading(false);
     setUploadProgress(0);
-    
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          return 100;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-  };
+  }
+};
 
   return (
     <div className="min-h-screen p-6" style={{ backgroundColor: colors.cream }}>
@@ -762,33 +791,289 @@ const UploadPage = ({ onNavigate }) => {
 
 // Dashboard Component
 const Dashboard = ({ onNavigate }) => {
-  const { user, logout } = useAuth();
-  const [invoices] = useState([
-    {
-      id: 1,
-      filename: 'invoice-001.pdf',
-      status: 'completed',
-      uploadedAt: '2025-08-29T10:30:00Z',
-      vendor: 'ABC Company',
-      total: '$1,250.00'
-    },
-    {
-      id: 2,
-      filename: 'receipt-002.jpg',
-      status: 'processing',
-      uploadedAt: '2025-08-29T11:15:00Z',
-      vendor: 'XYZ Corp',
-      total: null
-    },
-    {
-      id: 3,
-      filename: 'bill-003.png',
-      status: 'failed',
-      uploadedAt: '2025-08-29T09:45:00Z',
-      vendor: null,
-      total: null
+  const { user, authToken } = useAuth();
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [polling, setPolling] = useState(false);
+
+  // Fetch invoices from backend
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      try {
+        const response = await fetch('https://fatooraah.com/api/invoices', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch invoices');
+        }
+        
+        const data = await response.json();
+        setInvoices(data);
+        
+        // Check if any invoices are processing
+        const hasProcessing = data.some(inv => inv.status === 'processing' || inv.status === 'pending');
+        setPolling(hasProcessing);
+        
+      } catch (error) {
+        console.error('Error fetching invoices:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (authToken) {
+      fetchInvoices();
     }
-  ]);
+  }, [authToken]);
+  
+  // Poll for updates if there are processing invoices
+  useEffect(() => {
+    if (!polling) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch('https://fatooraah.com/api/invoices', {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setInvoices(data);
+          
+          // Stop polling if no processing invoices
+          const hasProcessing = data.some(inv => inv.status === 'processing' || inv.status === 'pending');
+          if (!hasProcessing) {
+            setPolling(false);
+          }
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+    
+    return () => clearInterval(interval);
+  }, [polling, authToken]);
+  
+  const handleDownload = async (invoiceId, filename) => {
+    try {
+      const response = await fetch(`https://fatooraah.com/api/invoices/download/${invoiceId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+      
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename.replace(/\.(pdf|jpg|jpeg|png)$/i, '.xlsx');
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download: ' + error.message);
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'completed': return <CheckCircle className="text-green-500" size={20} />;
+      case 'processing': return <Clock className="text-yellow-500 animate-spin" size={20} />;
+      case 'pending': return <Clock className="text-blue-500" size={20} />;
+      case 'failed': return <AlertCircle className="text-red-500" size={20} />;
+      default: return null;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed': return 'text-green-600';
+      case 'processing': return 'text-yellow-600';
+      case 'pending': return 'text-blue-600';
+      case 'failed': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center" style={{ backgroundColor: colors.cream }}>
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-gray-300 border-t-matcha rounded-full animate-spin mx-auto mb-4"></div>
+          <p style={{ color: colors.text }}>Loading invoices...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-6" style={{ backgroundColor: colors.cream }}>
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-between items-center mb-8"
+        >
+          <div>
+            <h1 className="text-3xl font-bold" style={{ color: colors.text }}>
+              Dashboard
+            </h1>
+            <p style={{ color: colors.textLight }}>
+              Welcome back, {user?.name || 'User'}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div 
+              className="px-4 py-2 rounded-lg text-white font-medium"
+              style={{ backgroundColor: colors.matcha }}
+            >
+              {user?.credits || 50} credits
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {[
+            { label: 'Total Invoices', value: invoices.length.toString(), icon: FileText },
+            { label: 'Completed', value: invoices.filter(i => i.status === 'completed').length.toString(), icon: CheckCircle },
+            { label: 'Processing', value: invoices.filter(i => i.status === 'processing' || i.status === 'pending').length.toString(), icon: Clock }
+          ].map((stat, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-white rounded-2xl p-6 shadow-lg"
+            >
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: colors.cream }}
+                >
+                  <stat.icon size={24} style={{ color: colors.matcha }} />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold" style={{ color: colors.text }}>
+                    {stat.value}
+                  </p>
+                  <p className="text-sm" style={{ color: colors.textLight }}>
+                    {stat.label}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Recent Invoices */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white rounded-2xl shadow-lg overflow-hidden"
+        >
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+            <h2 className="text-xl font-semibold" style={{ color: colors.text }}>
+              Recent Invoices
+            </h2>
+            {polling && (
+              <span className="text-sm px-3 py-1 bg-blue-100 text-blue-600 rounded-full flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
+                Auto-refreshing...
+              </span>
+            )}
+          </div>
+          
+          {invoices.length === 0 ? (
+            <div className="p-12 text-center">
+              <FileText size={48} className="mx-auto mb-4 text-gray-300" />
+              <p className="text-gray-500 mb-4">No invoices yet</p>
+              <button
+                onClick={() => onNavigate('upload')}
+                className="px-6 py-3 rounded-lg text-white font-medium"
+                style={{ backgroundColor: colors.matcha }}
+              >
+                Upload Your First Invoice
+              </button>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {invoices.map((invoice, i) => (
+                <motion.div
+                  key={invoice.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="p-6 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      {getStatusIcon(invoice.status)}
+                      <div className="flex-1">
+                        <p className="font-medium" style={{ color: colors.text }}>
+                          {invoice.filename}
+                        </p>
+                        <p className="text-sm" style={{ color: colors.textLight }}>
+                          {invoice.vendor_name || 'Processing...'}
+                          {invoice.invoice_date && ` • ${formatDate(invoice.invoice_date)}`}
+                        </p>
+                        {invoice.error_message && (
+                          <p className="text-xs text-red-500 mt-1">{invoice.error_message}</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      {invoice.total_amount && (
+                        <span className="font-semibold" style={{ color: colors.text }}>
+                          ${invoice.total_amount}
+                        </span>
+                      )}
+                      <span className={`text-sm capitalize min-w-[80px] text-center ${getStatusColor(invoice.status)}`}>
+                        {invoice.status}
+                      </span>
+                      {invoice.status === 'completed' && (
+                        <button
+                          onClick={() => handleDownload(invoice.id, invoice.filename)}
+                          className="p-2 rounded-lg hover:scale-110 transition-transform"
+                          style={{ backgroundColor: colors.cream }}
+                          title="Download Excel"
+                        >
+                          <Download size={16} style={{ color: colors.matcha }} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+};
 
   const getStatusIcon = (status) => {
     switch (status) {
